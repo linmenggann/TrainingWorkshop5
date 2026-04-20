@@ -17,6 +17,7 @@
 
 const SHEET_ID = '1idrIOTSCd1Ev2CHZ0I306N-LyqJViEpxXyQAML-aw6I';
 const SHEET_NAME = '工作坊報名資料';
+const MAX_REGISTRATIONS = 4;
 
 const HEADERS = [
   '報名時間',
@@ -33,12 +34,22 @@ const HEADERS = [
 /**
  * 接收前端 POST 請求並寫入試算表。
  * 前端以 text/plain 傳送 JSON 字串（避免 CORS preflight）。
+ * 若報名人數已達 MAX_REGISTRATIONS，回傳 status=full 並拒絕寫入。
  */
 function doPost(e) {
   try {
     const payload = JSON.parse(e.postData.contents);
-
     const sheet = getOrCreateSheet_();
+    const current = countRegistrations_(sheet);
+
+    if (current >= MAX_REGISTRATIONS) {
+      return jsonResponse_({
+        status: 'full',
+        message: '報名已額滿',
+        total: current,
+        max: MAX_REGISTRATIONS
+      });
+    }
 
     sheet.appendRow([
       new Date(),
@@ -52,7 +63,14 @@ function doPost(e) {
       payload.phone || ''
     ]);
 
-    return jsonResponse_({ status: 'ok' });
+    const newTotal = current + 1;
+    return jsonResponse_({
+      status: 'ok',
+      total: newTotal,
+      max: MAX_REGISTRATIONS,
+      remaining: Math.max(0, MAX_REGISTRATIONS - newTotal),
+      full: newTotal >= MAX_REGISTRATIONS
+    });
   } catch (err) {
     return jsonResponse_({ status: 'error', message: String(err) });
   }
@@ -61,6 +79,8 @@ function doPost(e) {
 /**
  * GET 端點：
  *   - 無參數或 action=ping：健康檢查
+ *   - action=capacity：回傳目前報名人數 / 上限 / 是否額滿（輕量查詢）
+ *   - action=register：以 JSONP 方式送出報名，可直接讀取額滿狀態
  *   - action=data：回傳報名資料陣列 + 統計摘要，供 dashboard.html 讀取
  *
  * 使用 JSONP 支援（callback 參數）避免瀏覽器跨網域問題；若未帶 callback
@@ -75,18 +95,94 @@ function doGet(e) {
     if (action === 'data') {
       return respond_(buildDataPayload_(), callback);
     }
-    return respond_({ status: 'ok', message: '教學訓練計畫主持人工作坊 API is running.' }, callback);
+    if (action === 'capacity') {
+      return respond_(buildCapacityPayload_(), callback);
+    }
+    if (action === 'register') {
+      return respond_(registerViaGet_(params.payload || '{}'), callback);
+    }
+    return respond_({
+      status: 'ok',
+      message: '教學訓練計畫主持人工作坊 API is running.',
+      capacity: buildCapacityPayload_()
+    }, callback);
   } catch (err) {
     return respond_({ status: 'error', message: String(err) }, callback);
   }
 }
 
+function buildCapacityPayload_() {
+  const sheet = getOrCreateSheet_();
+  const total = countRegistrations_(sheet);
+  return {
+    status: 'ok',
+    total: total,
+    max: MAX_REGISTRATIONS,
+    remaining: Math.max(0, MAX_REGISTRATIONS - total),
+    full: total >= MAX_REGISTRATIONS
+  };
+}
+
+function registerViaGet_(payloadRaw) {
+  let payload;
+  try {
+    payload = JSON.parse(payloadRaw);
+  } catch (err) {
+    return { status: 'error', message: '資料格式錯誤' };
+  }
+
+  const sheet = getOrCreateSheet_();
+  const current = countRegistrations_(sheet);
+
+  if (current >= MAX_REGISTRATIONS) {
+    return {
+      status: 'full',
+      message: '報名已額滿',
+      total: current,
+      max: MAX_REGISTRATIONS,
+      remaining: 0,
+      full: true
+    };
+  }
+
+  sheet.appendRow([
+    new Date(),
+    payload.name || '',
+    payload.org || '',
+    payload.title || '',
+    payload.profession || '',
+    payload.is_host || '',
+    payload.mode || '',
+    payload.email || '',
+    payload.phone || ''
+  ]);
+
+  const newTotal = current + 1;
+  return {
+    status: 'ok',
+    total: newTotal,
+    max: MAX_REGISTRATIONS,
+    remaining: Math.max(0, MAX_REGISTRATIONS - newTotal),
+    full: newTotal >= MAX_REGISTRATIONS
+  };
+}
+
+function countRegistrations_(sheet) {
+  return Math.max(0, sheet.getLastRow() - 1);
+}
+
 function buildDataPayload_() {
   const sheet = getOrCreateSheet_();
   const lastRow = sheet.getLastRow();
+  const capacity = {
+    max: MAX_REGISTRATIONS,
+    total: Math.max(0, lastRow - 1),
+    remaining: Math.max(0, MAX_REGISTRATIONS - Math.max(0, lastRow - 1)),
+    full: Math.max(0, lastRow - 1) >= MAX_REGISTRATIONS
+  };
 
   if (lastRow < 2) {
-    return { status: 'ok', total: 0, rows: [], stats: emptyStats_() };
+    return { status: 'ok', total: 0, rows: [], stats: emptyStats_(), capacity: capacity };
   }
 
   const values = sheet.getRange(2, 1, lastRow - 1, HEADERS.length).getValues();
@@ -120,7 +216,7 @@ function buildDataPayload_() {
     if (day) stats.by_day[day] = (stats.by_day[day] || 0) + 1;
   });
 
-  return { status: 'ok', total: rows.length, rows: rows, stats: stats };
+  return { status: 'ok', total: rows.length, rows: rows, stats: stats, capacity: capacity };
 }
 
 function emptyStats_() {

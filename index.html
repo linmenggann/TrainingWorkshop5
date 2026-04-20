@@ -356,6 +356,72 @@
     margin: 0 8px;
   }
 
+  /* Capacity banner */
+  .capacity-banner {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px 22px;
+    border-radius: 18px;
+    background: linear-gradient(90deg, rgba(255,110,199,0.2), rgba(138,43,226,0.2));
+    border: 1px solid rgba(255,255,255,0.25);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    margin-bottom: 16px;
+    font-weight: 700;
+    box-shadow: 0 8px 24px rgba(75,0,130,0.35);
+  }
+  .capacity-banner .c-ico { font-size: 26px; }
+  .capacity-banner .c-text { flex: 1; font-size: 15px; }
+  .capacity-banner .c-count {
+    font-size: 18px;
+    font-weight: 900;
+    padding: 6px 14px;
+    border-radius: 999px;
+    background: rgba(0,0,0,0.25);
+  }
+  .capacity-banner.ok .c-ico { animation: pulse 2s ease-in-out infinite; }
+  .capacity-banner.warn {
+    background: linear-gradient(90deg, rgba(255,193,7,0.35), rgba(255,87,34,0.35));
+  }
+  .capacity-banner.full {
+    background: linear-gradient(90deg, rgba(239,68,68,0.45), rgba(185,28,28,0.55));
+    border-color: rgba(255,255,255,0.35);
+  }
+
+  /* Full notice */
+  .full-notice {
+    padding: 40px 28px;
+    border-radius: 26px;
+    text-align: center;
+    background: linear-gradient(135deg, rgba(239,68,68,0.35), rgba(138,43,226,0.35));
+    border: 2px solid rgba(255,255,255,0.35);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    box-shadow: 0 20px 50px rgba(185,28,28,0.35);
+    margin-bottom: 40px;
+    animation: heroIn 0.6s ease both;
+  }
+  .full-notice .fn-big {
+    font-size: clamp(28px, 4vw, 40px);
+    font-weight: 900;
+    letter-spacing: 2px;
+    background: linear-gradient(90deg, #fff, #ffd1f5, #fff);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    margin-bottom: 10px;
+  }
+  .full-notice .fn-sub { font-size: 17px; color: #ffe6fa; margin-bottom: 14px; }
+  .full-notice .fn-extra { font-size: 14px; color: var(--muted); }
+
+  /* Disabled form overlay */
+  .form-card.disabled {
+    opacity: 0.55;
+    pointer-events: none;
+    filter: grayscale(0.2);
+  }
+
   /* toast */
   .toast {
     position: fixed;
@@ -454,7 +520,22 @@
 
     <!-- Registration Form -->
     <h2 class="section-title"><span class="dot"></span>📝 立即報名 Registration</h2>
-    <form class="form-card" onsubmit="handleSubmit(event)">
+
+    <!-- Capacity banner -->
+    <div id="capacityBanner" class="capacity-banner loading">
+      <span class="c-ico">⏳</span>
+      <span class="c-text">名額查詢中…</span>
+      <span class="c-count" id="capacityCount">— / 4</span>
+    </div>
+
+    <!-- Full notice (hidden until full) -->
+    <div id="fullNotice" class="full-notice" style="display:none;">
+      <div class="fn-big">🚫 本活動報名已額滿</div>
+      <div class="fn-sub">限額 4 名，系統已停止受理報名。感謝您的關注 💜</div>
+      <div class="fn-extra">若有任何疑問，請洽主辦單位：奇美醫院教學部 陳大頭（06-281-2811 分機 57112233）</div>
+    </div>
+
+    <form id="regForm" class="form-card" onsubmit="handleSubmit(event)">
       <div class="form-grid">
         <div class="field">
           <label>🙋 姓名 Name</label>
@@ -534,15 +615,92 @@
   // 部署 Apps Script 後，將下方網址替換為你的 Web app URL
   // 詳見 apps-script/README.md
   const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwavEMiXbUk0nLPPVN9ahxddfvrOVuZWifbfv3PBXuzfapU0PP4JI5jScldJoAMbY167Q/exec';
+  const MAX_SEATS = 4;
 
-  function showToast(msg, ok) {
+  // JSONP loader (Apps Script Web app + cross-origin)
+  function fetchJsonp(url) {
+    return new Promise((resolve, reject) => {
+      const cb = 'cb_' + Math.random().toString(36).slice(2);
+      const script = document.createElement('script');
+      const timeout = setTimeout(() => { cleanup(); reject(new Error('請求逾時')); }, 20000);
+      function cleanup() {
+        clearTimeout(timeout);
+        delete window[cb];
+        script.remove();
+      }
+      window[cb] = (data) => { cleanup(); resolve(data); };
+      script.onerror = () => { cleanup(); reject(new Error('網路錯誤')); };
+      const sep = url.includes('?') ? '&' : '?';
+      script.src = url + sep + 'callback=' + cb;
+      document.body.appendChild(script);
+    });
+  }
+
+  function showToast(msg, variant) {
     const toast = document.getElementById('toast');
     toast.textContent = msg;
-    toast.style.background = ok
-      ? 'linear-gradient(90deg, #ff6ec7, #b24bf3)'
-      : 'linear-gradient(90deg, #ef4444, #b91c1c)';
+    const bg = {
+      ok:   'linear-gradient(90deg, #ff6ec7, #b24bf3)',
+      err:  'linear-gradient(90deg, #ef4444, #b91c1c)',
+      full: 'linear-gradient(90deg, #f59e0b, #b91c1c)'
+    };
+    toast.style.background = bg[variant] || bg.ok;
     toast.classList.add('show');
-    setTimeout(() => toast.classList.remove('show'), 3000);
+    setTimeout(() => toast.classList.remove('show'), 3200);
+  }
+
+  function updateCapacityUI(cap) {
+    const total = Math.min(cap.total || 0, cap.max || MAX_SEATS);
+    const max = cap.max || MAX_SEATS;
+    const remaining = Math.max(0, max - total);
+    const banner = document.getElementById('capacityBanner');
+    const count = document.getElementById('capacityCount');
+    const ico = banner.querySelector('.c-ico');
+    const text = banner.querySelector('.c-text');
+
+    count.textContent = `${total} / ${max}`;
+    banner.classList.remove('loading','ok','warn','full');
+
+    if (cap.full || remaining <= 0) {
+      banner.classList.add('full');
+      ico.textContent = '🚫';
+      text.textContent = '本活動報名已額滿，系統已停止受理報名';
+      renderFull();
+    } else if (remaining === 1) {
+      banner.classList.add('warn');
+      ico.textContent = '⚡️';
+      text.textContent = '僅剩最後 1 個名額，手刀報名中！';
+    } else {
+      banner.classList.add('ok');
+      ico.textContent = '🎟';
+      text.textContent = `目前剩餘 ${remaining} 個名額，歡迎把握機會報名`;
+    }
+  }
+
+  function renderFull() {
+    document.getElementById('fullNotice').style.display = 'block';
+    const form = document.getElementById('regForm');
+    form.classList.add('disabled');
+    const btn = form.querySelector('.submit');
+    btn.disabled = true;
+    btn.textContent = '🚫 已額滿，停止受理';
+    form.querySelectorAll('input, select, button').forEach(el => el.disabled = true);
+  }
+
+  async function checkCapacity() {
+    try {
+      const res = await fetchJsonp(APPS_SCRIPT_URL + '?action=capacity');
+      if (res && res.status === 'ok') {
+        updateCapacityUI(res);
+      } else {
+        throw new Error((res && res.message) || '未知錯誤');
+      }
+    } catch (err) {
+      const banner = document.getElementById('capacityBanner');
+      banner.classList.remove('loading');
+      banner.querySelector('.c-ico').textContent = '⚠️';
+      banner.querySelector('.c-text').textContent = '名額查詢暫時無法使用，仍可嘗試送出報名';
+    }
   }
 
   async function handleSubmit(e) {
@@ -556,21 +714,32 @@
     const payload = Object.fromEntries(new FormData(form).entries());
 
     try {
-      await fetch(APPS_SCRIPT_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify(payload)
-      });
-      showToast('🎊 報名已送出，感謝您的參與！', true);
+      const url = APPS_SCRIPT_URL + '?action=register&payload=' + encodeURIComponent(JSON.stringify(payload));
+      const res = await fetchJsonp(url);
+
+      if (res.status === 'full') {
+        updateCapacityUI(res);
+        showToast('🚫 報名已額滿，停止受理', 'full');
+        return;
+      }
+      if (res.status !== 'ok') {
+        throw new Error(res.message || '送出失敗');
+      }
+
+      updateCapacityUI(res);
+      showToast('🎊 報名已送出，感謝您的參與！', 'ok');
       form.reset();
     } catch (err) {
-      showToast('⚠️ 送出失敗，請稍後再試', false);
+      showToast('⚠️ 送出失敗：' + err.message, 'err');
     } finally {
-      btn.disabled = false;
-      btn.textContent = originalText;
+      if (!form.classList.contains('disabled')) {
+        btn.disabled = false;
+        btn.textContent = originalText;
+      }
     }
   }
+
+  checkCapacity();
 </script>
 </body>
 </html>

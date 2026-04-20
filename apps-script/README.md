@@ -32,6 +32,16 @@
 
 修改 `Code.gs` 後，請至「**管理部署作業** → 編輯 ✏️ → 版本選 **新版本** → 部署」，舊的 URL 才會指向最新程式碼。
 
+## 🎟 報名人數上限
+
+`Code.gs` 頂端的 `MAX_REGISTRATIONS` 常數控制報名人數上限（預設 **4 名**）。
+
+- `doPost` / `action=register`：寫入前檢查人數，超過即回傳 `status: "full"` 並拒絕寫入。
+- `action=capacity`：輕量查詢端點，回傳 `{ total, max, remaining, full }`，供 `index.html` 載入時檢查額滿狀態。
+- `action=data`：回傳資料同時附上 `capacity` 物件，dashboard 顯示「剩 X 席／額滿」。
+
+調整上限後請記得 **重新部署新版本** 才會生效。
+
 ## 📊 儀表板（dashboard.html）
 
 `dashboard.html` 會透過 `?action=data&callback=xxx` 以 JSONP 方式讀取試算表資料並顯示：
