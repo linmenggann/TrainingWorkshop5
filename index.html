@@ -490,16 +490,16 @@
         <div class="field full">
           <label>🎓 您目前是否擔任教學訓練計畫主持人？</label>
           <div class="radio-group">
-            <label><input type="radio" name="is_host" value="yes" required /><span>✅ 是</span></label>
-            <label><input type="radio" name="is_host" value="no" /><span>❌ 否</span></label>
+            <label><input type="radio" name="is_host" value="是" required /><span>✅ 是</span></label>
+            <label><input type="radio" name="is_host" value="否" /><span>❌ 否</span></label>
           </div>
         </div>
 
         <div class="field full">
           <label>🚀 您預計以何種方式參與？</label>
           <div class="radio-group">
-            <label><input type="radio" name="mode" value="onsite" required /><span>🏥 實體</span></label>
-            <label><input type="radio" name="mode" value="online" /><span>💻 線上</span></label>
+            <label><input type="radio" name="mode" value="實體" required /><span>🏥 實體</span></label>
+            <label><input type="radio" name="mode" value="線上" /><span>💻 線上</span></label>
           </div>
         </div>
 
@@ -531,12 +531,45 @@
   <div class="toast" id="toast">🎊 報名已送出，感謝您的參與！</div>
 
 <script>
-  function handleSubmit(e) {
-    e.preventDefault();
+  // 部署 Apps Script 後，將下方網址替換為你的 Web app URL
+  // 詳見 apps-script/README.md
+  const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/REPLACE_WITH_YOUR_DEPLOYMENT_ID/exec';
+
+  function showToast(msg, ok) {
     const toast = document.getElementById('toast');
+    toast.textContent = msg;
+    toast.style.background = ok
+      ? 'linear-gradient(90deg, #ff6ec7, #b24bf3)'
+      : 'linear-gradient(90deg, #ef4444, #b91c1c)';
     toast.classList.add('show');
-    setTimeout(() => toast.classList.remove('show'), 2800);
-    e.target.reset();
+    setTimeout(() => toast.classList.remove('show'), 3000);
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    const form = e.target;
+    const btn = form.querySelector('.submit');
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '🚀 送出中…';
+
+    const payload = Object.fromEntries(new FormData(form).entries());
+
+    try {
+      await fetch(APPS_SCRIPT_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(payload)
+      });
+      showToast('🎊 報名已送出，感謝您的參與！', true);
+      form.reset();
+    } catch (err) {
+      showToast('⚠️ 送出失敗，請稍後再試', false);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = originalText;
+    }
   }
 </script>
 </body>
