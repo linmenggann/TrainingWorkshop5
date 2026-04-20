@@ -160,6 +160,14 @@
     background: radial-gradient(circle, rgba(255,110,199,0.4), transparent 70%);
   }
   .kpi:hover { transform: translateY(-4px) scale(1.02); }
+  .kpi.card-warn {
+    background: linear-gradient(135deg, rgba(245,158,11,0.3), rgba(239,68,68,0.2));
+    border-color: rgba(255,193,7,0.5);
+  }
+  .kpi.card-full {
+    background: linear-gradient(135deg, rgba(239,68,68,0.45), rgba(185,28,28,0.5));
+    border-color: rgba(255,255,255,0.45);
+  }
   .kpi .label { font-size: 14px; color: var(--muted); display:flex; gap:6px; align-items:center; }
   .kpi .value { font-size: clamp(32px, 4vw, 44px); font-weight: 900; margin-top: 6px; line-height: 1.1; }
   .kpi .foot { font-size: 13px; color: var(--muted); margin-top: 8px; }
@@ -310,6 +318,11 @@
         <div class="value" id="kpi-total">—</div>
         <div class="foot" id="kpi-total-foot">尚未載入</div>
       </div>
+      <div class="kpi" id="kpi-capacity-card">
+        <div class="label">🎟 名額狀態 (上限 4 名)</div>
+        <div class="value" id="kpi-capacity">—</div>
+        <div class="foot" id="kpi-capacity-foot">—</div>
+      </div>
       <div class="kpi">
         <div class="label">🏥 實體參與</div>
         <div class="value" id="kpi-onsite">—</div>
@@ -424,7 +437,7 @@
     return `${d.getFullYear()}/${p(d.getMonth()+1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
   }
 
-  function updateKPIs(total, stats) {
+  function updateKPIs(total, stats, capacity) {
     const onsite = stats.by_mode['實體'] || 0;
     const online = stats.by_mode['線上'] || 0;
     const host = stats.by_is_host['是'] || 0;
@@ -432,6 +445,25 @@
 
     document.getElementById('kpi-total').textContent = total;
     document.getElementById('kpi-total-foot').textContent = total === 0 ? '目前尚無資料' : `來自 ${Object.keys(stats.by_profession).length} 種職類`;
+
+    const cap = capacity || { max: 4, total: total, remaining: Math.max(0, 4 - total), full: total >= 4 };
+    const capEl = document.getElementById('kpi-capacity');
+    const capFoot = document.getElementById('kpi-capacity-foot');
+    const capCard = document.getElementById('kpi-capacity-card');
+    capCard.classList.remove('card-warn','card-full');
+
+    if (cap.full) {
+      capEl.innerHTML = '🚫 額滿';
+      capFoot.textContent = `${cap.total} / ${cap.max}（系統已停止受理報名）`;
+      capCard.classList.add('card-full');
+    } else if (cap.remaining === 1) {
+      capEl.textContent = `剩 ${cap.remaining} 席`;
+      capFoot.textContent = `${cap.total} / ${cap.max}（最後 1 席）`;
+      capCard.classList.add('card-warn');
+    } else {
+      capEl.textContent = `剩 ${cap.remaining} 席`;
+      capFoot.textContent = `${cap.total} / ${cap.max}`;
+    }
 
     document.getElementById('kpi-onsite').textContent = onsite;
     document.getElementById('kpi-onsite-foot').textContent = total ? `佔比 ${((onsite/total)*100).toFixed(1)}%` : '—';
@@ -612,7 +644,7 @@
       if (data.status !== 'ok') throw new Error(data.message || '未知錯誤');
       const total = data.total || 0;
       const stats = data.stats || { by_profession:{}, by_is_host:{}, by_mode:{}, by_day:{} };
-      updateKPIs(total, stats);
+      updateKPIs(total, stats, data.capacity);
       renderCharts(stats);
       renderTable(data.rows || []);
       const now = new Date();
