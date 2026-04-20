@@ -32,6 +32,16 @@
 
 修改 `Code.gs` 後，請至「**管理部署作業** → 編輯 ✏️ → 版本選 **新版本** → 部署」，舊的 URL 才會指向最新程式碼。
 
+## 📊 儀表板（dashboard.html）
+
+`dashboard.html` 會透過 `?action=data&callback=xxx` 以 JSONP 方式讀取試算表資料並顯示：
+
+- KPI：總報名數、實體／線上人數、現任主持人數
+- 圖表：職類分佈（doughnut）、參與方式（bar）、是否擔任主持人（pie）、每日報名趨勢（line）
+- 最新 20 筆報名名單
+
+> Email 與電話在後端已做隱碼處理（例：`ab***@gmail.com`、`091****678`），降低外洩風險。
+
 ## 🧪 本機測試
 
 1. 在瀏覽器直接打開 Apps Script Web app URL，應回傳 `{"status":"ok",...}`。
