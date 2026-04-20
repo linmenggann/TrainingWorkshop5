@@ -59,10 +59,104 @@ function doPost(e) {
 }
 
 /**
- * GET 測試端點：部署後於瀏覽器開啟 URL 會看到 OK 訊息。
+ * GET 端點：
+ *   - 無參數或 action=ping：健康檢查
+ *   - action=data：回傳報名資料陣列 + 統計摘要，供 dashboard.html 讀取
+ *
+ * 使用 JSONP 支援（callback 參數）避免瀏覽器跨網域問題；若未帶 callback
+ * 則回傳純 JSON。
  */
-function doGet() {
-  return jsonResponse_({ status: 'ok', message: '教學訓練計畫主持人工作坊 API is running.' });
+function doGet(e) {
+  const params = (e && e.parameter) || {};
+  const action = params.action || 'ping';
+  const callback = params.callback || '';
+
+  try {
+    if (action === 'data') {
+      return respond_(buildDataPayload_(), callback);
+    }
+    return respond_({ status: 'ok', message: '教學訓練計畫主持人工作坊 API is running.' }, callback);
+  } catch (err) {
+    return respond_({ status: 'error', message: String(err) }, callback);
+  }
+}
+
+function buildDataPayload_() {
+  const sheet = getOrCreateSheet_();
+  const lastRow = sheet.getLastRow();
+
+  if (lastRow < 2) {
+    return { status: 'ok', total: 0, rows: [], stats: emptyStats_() };
+  }
+
+  const values = sheet.getRange(2, 1, lastRow - 1, HEADERS.length).getValues();
+
+  const rows = values.map(function (r) {
+    return {
+      timestamp: r[0] instanceof Date ? r[0].toISOString() : String(r[0] || ''),
+      name: String(r[1] || ''),
+      org: String(r[2] || ''),
+      title: String(r[3] || ''),
+      profession: String(r[4] || ''),
+      is_host: String(r[5] || ''),
+      mode: String(r[6] || ''),
+      email: maskEmail_(String(r[7] || '')),
+      phone: maskPhone_(String(r[8] || ''))
+    };
+  });
+
+  const stats = {
+    by_profession: {},
+    by_is_host: {},
+    by_mode: {},
+    by_day: {}
+  };
+
+  rows.forEach(function (row) {
+    stats.by_profession[row.profession] = (stats.by_profession[row.profession] || 0) + 1;
+    stats.by_is_host[row.is_host] = (stats.by_is_host[row.is_host] || 0) + 1;
+    stats.by_mode[row.mode] = (stats.by_mode[row.mode] || 0) + 1;
+    const day = (row.timestamp || '').slice(0, 10);
+    if (day) stats.by_day[day] = (stats.by_day[day] || 0) + 1;
+  });
+
+  return { status: 'ok', total: rows.length, rows: rows, stats: stats };
+}
+
+function emptyStats_() {
+  return { by_profession: {}, by_is_host: {}, by_mode: {}, by_day: {} };
+}
+
+/**
+ * 隱碼處理：僅供 dashboard 顯示用，避免 Email / 電話完整外流。
+ */
+function maskEmail_(email) {
+  if (!email || email.indexOf('@') < 0) return email;
+  const parts = email.split('@');
+  const name = parts[0];
+  const head = name.slice(0, Math.min(2, name.length));
+  return head + '***@' + parts[1];
+}
+
+function maskPhone_(phone) {
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length < 4) return phone;
+  return phone.slice(0, 3) + '****' + phone.slice(-3);
+}
+
+function respond_(obj, callback) {
+  if (callback) {
+    return ContentService
+      .createTextOutput(callback + '(' + JSON.stringify(obj) + ')')
+      .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
+  return ContentService
+    .createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function jsonResponse_(obj) {
+  return respond_(obj, '');
 }
 
 /**
@@ -97,10 +191,4 @@ function getOrCreateSheet_() {
     sheet.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]);
   }
   return sheet;
-}
-
-function jsonResponse_(obj) {
-  return ContentService
-    .createTextOutput(JSON.stringify(obj))
-    .setMimeType(ContentService.MimeType.JSON);
 }

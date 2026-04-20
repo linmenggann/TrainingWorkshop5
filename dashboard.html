@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>📊 教學訓練計畫主持人工作坊｜報名現況儀表板</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --p1: #6a11cb;
+    --p2: #8a2be2;
+    --p3: #b24bf3;
+    --p4: #ff6ec7;
+    --glass: rgba(255,255,255,0.12);
+    --glass-strong: rgba(255,255,255,0.22);
+    --text: #ffffff;
+    --muted: #e9d5ff;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+    color: var(--text);
+    background: linear-gradient(135deg, #1a0533 0%, #4b0082 25%, #6a11cb 50%, #a020f0 75%, #ff6ec7 100%);
+    background-size: 400% 400%;
+    animation: bgShift 18s ease infinite;
+    overflow-x: hidden;
+    position: relative;
+  }
+
+  @keyframes bgShift {
+    0%   { background-position: 0% 50%; }
+    50%  { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+
+  .bubble {
+    position: fixed;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.5), rgba(255,110,199,0.2));
+    filter: blur(2px);
+    pointer-events: none;
+    animation: float 12s ease-in-out infinite;
+    z-index: 0;
+  }
+  .bubble.b1 { width:140px; height:140px; top:10%; left:8%; }
+  .bubble.b2 { width:90px;  height:90px;  top:30%; right:10%; animation-delay:3s; }
+  .bubble.b3 { width:180px; height:180px; bottom:12%; left:15%; animation-delay:6s; }
+  .bubble.b4 { width:70px;  height:70px;  bottom:20%; right:20%; animation-delay:2s; }
+
+  @keyframes float {
+    0%,100% { transform: translateY(0) translateX(0) scale(1); opacity: 0.55; }
+    50%     { transform: translateY(-40px) translateX(25px) scale(1.08); opacity: 0.85; }
+  }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 40px 24px 80px;
+  }
+
+  /* Header */
+  .topbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 26px 28px;
+    border-radius: 24px;
+    background: rgba(255,255,255,0.1);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid rgba(255,255,255,0.18);
+    box-shadow: 0 20px 60px rgba(106,17,203,0.35);
+    margin-bottom: 30px;
+  }
+  .topbar .title {
+    font-size: clamp(22px, 3vw, 32px);
+    font-weight: 900;
+    background: linear-gradient(90deg, #fff, #ffd1f5);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .topbar .sub { font-size: 13px; color: var(--muted); margin-top: 4px; }
+  .topbar .actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+  .btn {
+    padding: 10px 18px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.3);
+    background: rgba(255,255,255,0.14);
+    color: #fff;
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    text-decoration: none;
+  }
+  .btn:hover {
+    background: linear-gradient(90deg, #ff6ec7, #b24bf3);
+    transform: translateY(-2px);
+    box-shadow: 0 10px 24px rgba(255,110,199,0.4);
+  }
+  .btn.primary {
+    background: linear-gradient(90deg, #ff6ec7, #b24bf3);
+    border-color: transparent;
+  }
+
+  .live-dot {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #7CFC00;
+    box-shadow: 0 0 10px #7CFC00;
+    animation: blink 1.4s ease-in-out infinite;
+    margin-right: 6px;
+  }
+  @keyframes blink {
+    0%,100% { opacity: 1; }
+    50% { opacity: 0.35; }
+  }
+
+  /* KPI Cards */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 18px;
+    margin-bottom: 30px;
+  }
+
+  .kpi {
+    position: relative;
+    padding: 22px;
+    border-radius: 22px;
+    background: var(--glass);
+    border: 1px solid rgba(255,255,255,0.22);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    box-shadow: 0 10px 30px rgba(75,0,130,0.35);
+    overflow: hidden;
+    transition: transform 0.3s ease;
+  }
+  .kpi::after {
+    content: "";
+    position: absolute;
+    width: 120px; height: 120px;
+    right: -30px; bottom: -30px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,110,199,0.4), transparent 70%);
+  }
+  .kpi:hover { transform: translateY(-4px) scale(1.02); }
+  .kpi .label { font-size: 14px; color: var(--muted); display:flex; gap:6px; align-items:center; }
+  .kpi .value { font-size: clamp(32px, 4vw, 44px); font-weight: 900; margin-top: 6px; line-height: 1.1; }
+  .kpi .foot { font-size: 13px; color: var(--muted); margin-top: 8px; }
+
+  .section-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 22px;
+    font-weight: 800;
+    margin: 24px 0 16px;
+  }
+  .section-title .dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: linear-gradient(90deg, #ff6ec7, #b24bf3);
+    box-shadow: 0 0 18px #ff6ec7;
+  }
+
+  /* Panels */
+  .grid-2 {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 18px;
+    margin-bottom: 30px;
+  }
+  .grid-main {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 18px;
+    margin-bottom: 30px;
+  }
+  @media (max-width: 900px) { .grid-main { grid-template-columns: 1fr; } }
+
+  .panel {
+    padding: 22px;
+    border-radius: 22px;
+    background: var(--glass);
+    border: 1px solid rgba(255,255,255,0.22);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    box-shadow: 0 10px 30px rgba(75,0,130,0.35);
+  }
+  .panel h3 {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 17px;
+    margin-bottom: 14px;
+    color: #fff;
+  }
+  .panel .chart-wrap {
+    position: relative;
+    height: 280px;
+  }
+
+  /* Table */
+  .table-wrap { overflow-x: auto; }
+  table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 14px;
+  }
+  thead th {
+    text-align: left;
+    padding: 12px 14px;
+    color: #ffe6fa;
+    font-weight: 700;
+    font-size: 13px;
+    background: rgba(255,255,255,0.08);
+    border-bottom: 1px solid rgba(255,255,255,0.2);
+    white-space: nowrap;
+  }
+  tbody td {
+    padding: 12px 14px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    vertical-align: top;
+  }
+  tbody tr:hover td { background: rgba(255,255,255,0.06); }
+  .pill {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.2);
+  }
+  .pill.onsite { background: linear-gradient(90deg, #ff6ec7, #b24bf3); border-color: transparent; }
+  .pill.online { background: linear-gradient(90deg, #4facfe, #00f2fe); border-color: transparent; color:#072540; }
+  .pill.host-yes { background: linear-gradient(90deg, #ffd166, #ef476f); border-color: transparent; }
+  .pill.host-no { background: rgba(255,255,255,0.14); }
+
+  /* States */
+  .state {
+    padding: 40px;
+    text-align: center;
+    color: var(--muted);
+  }
+  .state .big { font-size: 56px; margin-bottom: 10px; }
+  .error { color: #ffdede; }
+
+  .spinner {
+    width: 36px; height: 36px;
+    border: 4px solid rgba(255,255,255,0.2);
+    border-top-color: #ff6ec7;
+    border-radius: 50%;
+    animation: spin 0.9s linear infinite;
+    margin: 20px auto;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  footer {
+    text-align: center;
+    padding: 20px;
+    color: var(--muted);
+    font-size: 13px;
+  }
+</style>
+</head>
+<body>
+
+  <div class="bubble b1"></div>
+  <div class="bubble b2"></div>
+  <div class="bubble b3"></div>
+  <div class="bubble b4"></div>
+
+  <div class="container">
+
+    <!-- Top bar -->
+    <div class="topbar">
+      <div>
+        <div class="title">📊 報名現況儀表板 Dashboard</div>
+        <div class="sub">🎓 教學訓練計畫主持人工作坊 ｜ 2026/01/25</div>
+      </div>
+      <div class="actions">
+        <span class="btn" style="pointer-events:none;">
+          <span class="live-dot"></span>
+          <span id="updatedAt">載入中…</span>
+        </span>
+        <button class="btn primary" onclick="loadData()">🔄 重新整理</button>
+        <a class="btn" href="index.html">📝 報名頁</a>
+      </div>
+    </div>
+
+    <!-- KPI Cards -->
+    <div class="kpi-grid">
+      <div class="kpi">
+        <div class="label">👥 總報名人數</div>
+        <div class="value" id="kpi-total">—</div>
+        <div class="foot" id="kpi-total-foot">尚未載入</div>
+      </div>
+      <div class="kpi">
+        <div class="label">🏥 實體參與</div>
+        <div class="value" id="kpi-onsite">—</div>
+        <div class="foot" id="kpi-onsite-foot">—</div>
+      </div>
+      <div class="kpi">
+        <div class="label">💻 線上參與</div>
+        <div class="value" id="kpi-online">—</div>
+        <div class="foot" id="kpi-online-foot">—</div>
+      </div>
+      <div class="kpi">
+        <div class="label">🎓 現任主持人</div>
+        <div class="value" id="kpi-host">—</div>
+        <div class="foot" id="kpi-host-foot">—</div>
+      </div>
+    </div>
+
+    <!-- Charts -->
+    <h2 class="section-title"><span class="dot"></span>📈 統計圖表</h2>
+    <div class="grid-main">
+      <div class="panel">
+        <h3>🧑‍⚕️ 職類分佈</h3>
+        <div class="chart-wrap"><canvas id="chartProfession"></canvas></div>
+      </div>
+      <div class="panel">
+        <h3>🚀 參與方式</h3>
+        <div class="chart-wrap"><canvas id="chartMode"></canvas></div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="panel">
+        <h3>🎯 是否擔任主持人</h3>
+        <div class="chart-wrap"><canvas id="chartHost"></canvas></div>
+      </div>
+      <div class="panel">
+        <h3>🗓 每日報名趨勢</h3>
+        <div class="chart-wrap"><canvas id="chartDaily"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Recent table -->
+    <h2 class="section-title"><span class="dot"></span>🆕 最新報名名單</h2>
+    <div class="panel">
+      <div class="table-wrap">
+        <table id="recentTable">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>報名時間</th>
+              <th>姓名</th>
+              <th>機構</th>
+              <th>職稱</th>
+              <th>職類</th>
+              <th>主持人</th>
+              <th>參與方式</th>
+              <th>Email</th>
+              <th>電話</th>
+            </tr>
+          </thead>
+          <tbody id="recentBody">
+            <tr><td colspan="10"><div class="state"><div class="spinner"></div>載入資料中…</div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <footer>
+      💜 資料來源：Google Sheets「工作坊報名資料」｜每 60 秒自動重新整理 ｜ 奇美醫院教學部
+    </footer>
+  </div>
+
+<script>
+  const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwavEMiXbUk0nLPPVN9ahxddfvrOVuZWifbfv3PBXuzfapU0PP4JI5jScldJoAMbY167Q/exec';
+  const AUTO_REFRESH_MS = 60000;
+
+  const PALETTE = [
+    '#ff6ec7','#b24bf3','#6a11cb','#4facfe','#00f2fe',
+    '#ffd166','#ef476f','#06d6a0','#f78fb3','#c77dff',
+    '#8a2be2','#ffa5ec'
+  ];
+
+  const charts = {};
+
+  // JSONP loader (Apps Script Web app + cross-origin)
+  function fetchJsonp(url) {
+    return new Promise((resolve, reject) => {
+      const cb = 'cb_' + Math.random().toString(36).slice(2);
+      const script = document.createElement('script');
+      const timeout = setTimeout(() => {
+        cleanup();
+        reject(new Error('請求逾時'));
+      }, 20000);
+      function cleanup() {
+        clearTimeout(timeout);
+        delete window[cb];
+        script.remove();
+      }
+      window[cb] = (data) => { cleanup(); resolve(data); };
+      script.onerror = () => { cleanup(); reject(new Error('載入失敗')); };
+      const sep = url.includes('?') ? '&' : '?';
+      script.src = url + sep + 'callback=' + cb;
+      document.body.appendChild(script);
+    });
+  }
+
+  function fmtTime(iso) {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    if (isNaN(d)) return iso;
+    const p = n => String(n).padStart(2,'0');
+    return `${d.getFullYear()}/${p(d.getMonth()+1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  }
+
+  function updateKPIs(total, stats) {
+    const onsite = stats.by_mode['實體'] || 0;
+    const online = stats.by_mode['線上'] || 0;
+    const host = stats.by_is_host['是'] || 0;
+    const nonHost = stats.by_is_host['否'] || 0;
+
+    document.getElementById('kpi-total').textContent = total;
+    document.getElementById('kpi-total-foot').textContent = total === 0 ? '目前尚無資料' : `來自 ${Object.keys(stats.by_profession).length} 種職類`;
+
+    document.getElementById('kpi-onsite').textContent = onsite;
+    document.getElementById('kpi-onsite-foot').textContent = total ? `佔比 ${((onsite/total)*100).toFixed(1)}%` : '—';
+
+    document.getElementById('kpi-online').textContent = online;
+    document.getElementById('kpi-online-foot').textContent = total ? `佔比 ${((online/total)*100).toFixed(1)}%` : '—';
+
+    document.getElementById('kpi-host').textContent = host;
+    document.getElementById('kpi-host-foot').textContent = total ? `非主持人 ${nonHost} 位` : '—';
+  }
+
+  function baseOpts(extra = {}) {
+    return {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          labels: { color: '#fff', font: { size: 12, family: 'inherit' } }
+        },
+        tooltip: {
+          backgroundColor: 'rgba(26,5,51,0.9)',
+          borderColor: 'rgba(255,110,199,0.4)',
+          borderWidth: 1,
+          titleColor: '#ffd1f5',
+          bodyColor: '#fff'
+        }
+      },
+      ...extra
+    };
+  }
+
+  function axisOpts() {
+    return {
+      scales: {
+        x: { ticks: { color: '#e9d5ff' }, grid: { color: 'rgba(255,255,255,0.08)' } },
+        y: { ticks: { color: '#e9d5ff' }, grid: { color: 'rgba(255,255,255,0.08)' }, beginAtZero: true, precision: 0 }
+      }
+    };
+  }
+
+  function upsertChart(key, ctx, config) {
+    if (charts[key]) {
+      charts[key].data = config.data;
+      charts[key].options = config.options;
+      charts[key].update();
+    } else {
+      charts[key] = new Chart(ctx, config);
+    }
+  }
+
+  function renderCharts(stats) {
+    const empty = { '尚無資料': 1 };
+
+    // Profession doughnut
+    const profLabels = Object.keys(stats.by_profession);
+    const profValues = profLabels.map(k => stats.by_profession[k]);
+    upsertChart('profession', document.getElementById('chartProfession'), {
+      type: 'doughnut',
+      data: {
+        labels: profLabels.length ? profLabels : Object.keys(empty),
+        datasets: [{
+          data: profValues.length ? profValues : Object.values(empty),
+          backgroundColor: PALETTE,
+          borderColor: 'rgba(255,255,255,0.15)',
+          borderWidth: 2
+        }]
+      },
+      options: baseOpts({
+        plugins: {
+          legend: { position: 'right', labels: { color: '#fff', font: { size: 12 } } },
+          tooltip: baseOpts().plugins.tooltip
+        },
+        cutout: '55%'
+      })
+    });
+
+    // Mode bar
+    const modeLabels = ['實體','線上'];
+    const modeValues = modeLabels.map(k => stats.by_mode[k] || 0);
+    upsertChart('mode', document.getElementById('chartMode'), {
+      type: 'bar',
+      data: {
+        labels: modeLabels,
+        datasets: [{
+          label: '人數',
+          data: modeValues,
+          backgroundColor: ['#ff6ec7','#4facfe'],
+          borderRadius: 12,
+          barThickness: 50
+        }]
+      },
+      options: baseOpts({ ...axisOpts(), plugins: { legend: { display: false }, tooltip: baseOpts().plugins.tooltip } })
+    });
+
+    // Host pie
+    const hostLabels = ['是','否'];
+    const hostValues = hostLabels.map(k => stats.by_is_host[k] || 0);
+    upsertChart('host', document.getElementById('chartHost'), {
+      type: 'pie',
+      data: {
+        labels: hostValues.some(v => v > 0) ? hostLabels : Object.keys(empty),
+        datasets: [{
+          data: hostValues.some(v => v > 0) ? hostValues : Object.values(empty),
+          backgroundColor: ['#ffd166','#a78bfa'],
+          borderColor: 'rgba(255,255,255,0.15)',
+          borderWidth: 2
+        }]
+      },
+      options: baseOpts({
+        plugins: {
+          legend: { position: 'bottom', labels: { color: '#fff' } },
+          tooltip: baseOpts().plugins.tooltip
+        }
+      })
+    });
+
+    // Daily line
+    const days = Object.keys(stats.by_day).sort();
+    const dayValues = days.map(d => stats.by_day[d]);
+    upsertChart('daily', document.getElementById('chartDaily'), {
+      type: 'line',
+      data: {
+        labels: days.length ? days : ['尚無資料'],
+        datasets: [{
+          label: '每日報名',
+          data: dayValues.length ? dayValues : [0],
+          fill: true,
+          tension: 0.35,
+          backgroundColor: 'rgba(255,110,199,0.2)',
+          borderColor: '#ff6ec7',
+          pointBackgroundColor: '#fff',
+          pointBorderColor: '#ff6ec7',
+          pointRadius: 5
+        }]
+      },
+      options: baseOpts({ ...axisOpts(), plugins: { legend: { display: false }, tooltip: baseOpts().plugins.tooltip } })
+    });
+  }
+
+  function renderTable(rows) {
+    const tbody = document.getElementById('recentBody');
+    if (!rows.length) {
+      tbody.innerHTML = `<tr><td colspan="10"><div class="state"><div class="big">🕊</div>目前尚無報名資料</div></td></tr>`;
+      return;
+    }
+    const sorted = [...rows].sort((a,b) => (b.timestamp || '').localeCompare(a.timestamp || ''));
+    const recent = sorted.slice(0, 20);
+    tbody.innerHTML = recent.map((r, i) => {
+      const modeCls = r.mode === '實體' ? 'onsite' : (r.mode === '線上' ? 'online' : '');
+      const hostCls = r.is_host === '是' ? 'host-yes' : 'host-no';
+      return `
+        <tr>
+          <td>${i + 1}</td>
+          <td>${fmtTime(r.timestamp)}</td>
+          <td><strong>${escapeHtml(r.name)}</strong></td>
+          <td>${escapeHtml(r.org)}</td>
+          <td>${escapeHtml(r.title)}</td>
+          <td>${escapeHtml(r.profession)}</td>
+          <td><span class="pill ${hostCls}">${escapeHtml(r.is_host || '—')}</span></td>
+          <td><span class="pill ${modeCls}">${escapeHtml(r.mode || '—')}</span></td>
+          <td>${escapeHtml(r.email)}</td>
+          <td>${escapeHtml(r.phone)}</td>
+        </tr>`;
+    }).join('');
+  }
+
+  function escapeHtml(s) {
+    return String(s ?? '').replace(/[&<>"']/g, c => ({
+      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+    }[c]));
+  }
+
+  async function loadData() {
+    const updated = document.getElementById('updatedAt');
+    updated.textContent = '載入中…';
+    try {
+      const data = await fetchJsonp(APPS_SCRIPT_URL + '?action=data');
+      if (data.status !== 'ok') throw new Error(data.message || '未知錯誤');
+      const total = data.total || 0;
+      const stats = data.stats || { by_profession:{}, by_is_host:{}, by_mode:{}, by_day:{} };
+      updateKPIs(total, stats);
+      renderCharts(stats);
+      renderTable(data.rows || []);
+      const now = new Date();
+      const p = n => String(n).padStart(2,'0');
+      updated.textContent = `最後更新 ${p(now.getHours())}:${p(now.getMinutes())}:${p(now.getSeconds())}`;
+    } catch (err) {
+      updated.textContent = '載入失敗';
+      document.getElementById('recentBody').innerHTML =
+        `<tr><td colspan="10"><div class="state error"><div class="big">⚠️</div>無法載入資料：${escapeHtml(err.message)}</div></td></tr>`;
+    }
+  }
+
+  loadData();
+  setInterval(loadData, AUTO_REFRESH_MS);
+</script>
+</body>
+</html>
