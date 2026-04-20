@@ -24,11 +24,40 @@
     font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, -apple-system, sans-serif;
     min-height: 100vh;
     color: var(--text);
-    background: linear-gradient(135deg, #1a0533 0%, #4b0082 25%, #6a11cb 50%, #a020f0 75%, #ff6ec7 100%);
-    background-size: 400% 400%;
-    animation: bgShift 18s ease infinite;
+    background-color: #1a0533;
     overflow-x: hidden;
     position: relative;
+  }
+
+  /* 固定背景圖層：布雷西亞廳特展照片 */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -2;
+    background-image: url('assets/布雷西亞廳特展.jpg');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+    filter: brightness(0.55) saturate(1.15);
+  }
+
+  /* 紫色漸層疊層：維持原本酷炫紫色氛圍並讓文字可讀 */
+  body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background: linear-gradient(135deg,
+      rgba(26,5,51,0.82) 0%,
+      rgba(75,0,130,0.72) 25%,
+      rgba(106,17,203,0.58) 50%,
+      rgba(160,32,240,0.52) 75%,
+      rgba(255,110,199,0.62) 100%);
+    background-size: 400% 400%;
+    animation: bgShift 18s ease infinite;
+    pointer-events: none;
   }
 
   @keyframes bgShift {
